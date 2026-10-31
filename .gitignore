@@ -10,3 +10,7 @@ src-tauri/target/
 # Platform icons are generated from the tracked SVG by `npm run icons`.
 src-tauri/icons/*
 !src-tauri/icons/source.svg
+
+# Local sprint reports and tools.
+work/
+.superpowers/
