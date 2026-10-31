@@ -1,0 +1,11 @@
+# MeePix Codex project defaults.
+# Root orchestrator: Sol 6.1. Subagents: Terra 6.1.
+# Models/settings are requests; actual use depends on Codex environment access.
+model = "gpt-6.1-sol"
+model_reasoning_effort = "high"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-6.1-terra"
+default_subagent_reasoning_effort = "medium"
