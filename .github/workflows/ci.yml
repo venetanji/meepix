@@ -45,8 +45,14 @@ jobs:
         run: npm run icons
       - name: Type-check and compile frontend
         run: npm run build
+      - name: Frontend interaction tests
+        run: npm test
       - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: |
+          cargo test --manifest-path crates/sprite-core/Cargo.toml
+          cargo test --manifest-path crates/easel-client/Cargo.toml
+          cargo test --manifest-path crates/meepix-app/Cargo.toml
+          cargo test --manifest-path src-tauri/Cargo.toml
 
   arch-package:
     name: Arch Linux x86_64 native pacman package
@@ -143,6 +149,8 @@ jobs:
         run: rustup update stable
       - name: Install JavaScript dependencies
         run: npm install --no-audit --no-fund
+      - name: Verify project persistence on this platform
+        run: cargo test --manifest-path crates/sprite-core/Cargo.toml
       - name: Package native application (no publishing)
         env:
           # Ad-hoc signing is suitable for CI smoke builds, not notarized releases.

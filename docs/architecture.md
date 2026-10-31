@@ -1,6 +1,6 @@
 # MeePix architecture (draft 0.1)
 
-MeePix is a local-first pixel art and sprite animation editor. The current scaffold is a frontend-only drawing prototype. The authoritative Rust document engine, animation timeline and generation job manager have not been implemented.
+MeePix is a local-first pixel art and sprite animation editor. The first native vertical slice implements the Rust document engine, snapshot-driven animation UI, local project storage and a bounded Easel proposal manager. See [sprint contracts](sprint-001-contracts.md) for the concrete IPC and [evidence](sprint-001-results.md) for tested scope and remaining limitations.
 
 ## Boundaries
 
