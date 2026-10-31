@@ -7,13 +7,24 @@ It borrows the read-only permission model, pinned GitHub actions and independent
 ## Triggers and build matrix
 
 - Pull requests, pushes to `main`, and manual `workflow_dispatch`.
-- Ubuntu 24.04 x64 — frontend compile + Rust tests and a separate `.deb` build.
+- Ubuntu 24.04 x64 — frontend compile + Rust tests. Ubuntu 22.04 x64 — portable `.AppImage` build (older glibc baseline).
 - Windows Server 2022 x64 — NSIS installer `*-setup.exe`.
 - macOS 15 Apple Silicon and macOS 15 Intel — `.dmg` bundles for both CPU architectures.
 
-Each installer is a GitHub Actions **workflow artifact** retained for 14 days. Download it from the successful run's **Artifacts** section. No GitHub Release is created and no upload keys, Apple certificates or external model services are needed. CI intentionally has `contents: read` permissions and checkout does not persist credentials.
+Each build is a GitHub Actions **workflow artifact** retained for 14 days. Download it from the successful run's **Artifacts** section. No GitHub Release is created and no upload keys, Apple certificates or external model services are needed. CI intentionally has `contents: read` permissions and checkout does not persist credentials.
 
 macOS builds use ad-hoc signing (`APPLE_SIGNING_IDENTITY=-`), not Apple Developer notarization. Windows installers are unsigned. Treat all artifacts as development previews.
+
+## Running on Arch / Omarchy
+
+Download the AppImage workflow artifact, unzip the artifact, then run:
+
+```sh
+chmod +x MeePix*.AppImage
+./MeePix*.AppImage
+```
+
+The executable name depends on the Tauri bundle version; use the `.AppImage` file you downloaded. Some AppImage runtimes require FUSE 2 compatibility on the host. For testing without FUSE mounting you may try `APPIMAGE_EXTRACT_AND_RUN=1 ./MeePix*.AppImage`. This is a development build, not a distro-tested or universally portable release.
 
 ## Local build
 
