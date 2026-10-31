@@ -6,3 +6,7 @@ src-tauri/target/
 .env.*
 !.env.example
 *.spriteproj.autosave
+
+# Platform icons are generated from the tracked SVG by `npm run icons`.
+src-tauri/icons/*
+!src-tauri/icons/source.svg
