@@ -6,7 +6,16 @@ MeePix aims to combine an editable sprite canvas, animation timeline, local imag
 
 ## Current status
 
-**Early prototype:** this repository contains a Tauri 2 + React/TypeScript desktop shell and a 32 × 32 frontend-only pencil/eraser canvas. Layers, animation, saving, undo/redo, generation, and agent tools are **planned, not yet implemented**. The Easel check button is currently a stub.
+The first functional slice has a Rust-owned 16/32/64/128 px RGBA document,
+independent layers and animation frames, pencil/eraser/fill, zoom/pan,
+previous-frame context, playback, undo/redo, lossless `.spriteproj` projects and
+PNG sprite-sheet/JSON export. Easel generation and reference edits produce
+reviewable candidates; acceptance is one reversible edit. The editor works
+without an AI service. The typed agent/provider boundary is a tested skeleton;
+provider inference and richer sprite tools remain follow-up work.
+
+See [sprint evidence and limitations](docs/sprint-001-results.md) and
+[Easel/model workflow follow-ups](docs/easel-workflow-followups.md).
 
 ## Development
 
@@ -17,13 +26,31 @@ npm install
 npm run tauri dev
 ```
 
-To run the frontend alone: `npm run dev`.
+To run the frontend alone: `npm run dev`. Artwork operations require the native
+backend; there is no separate browser document implementation. Tests inject a
+backend, and the browser smoke harness connects to the real Rust application.
 
-The Tauri scaffold builds in CI. Sprite-document features and model integrations are still in development.
+Configure generation in the launching process with `EASEL_URL` and optionally
+`EASEL_API_KEY` (never a `VITE_` variable). If only the key is set, the endpoint
+is `https://easel.ait4x.org`. HTTP is accepted only for literal loopback addresses.
+Tokens never enter frontend state or project files. Only Qwen-Image-2.1 is
+currently offered by the editor; discovery alone is not proof of model readiness.
+
+Projects and candidate originals/receipts are stored in the OS app-data directory
+for `org.agenticmedia.meepix`, in `projects/` and `candidates/`. Project names use
+letters, digits, hyphens and underscores. Saving another document over an existing
+name is refused; load that project to edit it, or choose a new name.
+
+Run `npm test`, `npm run build`, and `cargo test --manifest-path` for each of
+`crates/sprite-core/Cargo.toml`, `crates/easel-client/Cargo.toml`,
+`crates/meepix-app/Cargo.toml` and `src-tauri/Cargo.toml`.
+`npm run test:browser` requires Cargo and Chromium (`CHROMIUM_PATH` may override
+the executable). This optional smoke test binds a test-only Rust bridge to
+loopback; it is not part of the desktop binary.
 
 ## Architecture
 
-- **Tauri 2 / Rust:** future authoritative sprite document engine and undoable mutations
+- **Tauri 2 / Rust:** authoritative sprite document engine, persistence and undoable mutations
 - **React / TypeScript:** interactive editor and timeline interface
 - **Easel / ComfyUI:** separately operated, locally configured generation backend
 - **Agent:** GPT/cloud or local LLM, using the same validated editor tool protocol

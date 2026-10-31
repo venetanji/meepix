@@ -47,7 +47,8 @@ atomically, leaving original intact on failure. History is bounded.
 Tauri commands: `document_snapshot`, `document_create {width,height}`,
 `document_command {expectedRevision,command}`, `project_save {name}`,
 `project_load {name}`, `project_export {name}`. The first five return Snapshot;
-export returns an output-path string. Project names are single safe filenames;
+export returns an output-path string. A document may overwrite only its own
+saved/loaded target; existing unrelated names are refused. Project names are single safe filenames;
 storage is under app-data/projects, with no model-controlled filesystem paths.
 
 ## Easel proposals
@@ -68,7 +69,9 @@ Tauri commands: `easel_models` returns `{configured: bool, models: string[]}`;
 width,height,pixels: number[] | null,error: string | null}`. Preview pixels are
 deterministically nearest-neighbor resized to the document dimensions, with
 this conversion disclosed in UI. Originals, receipt and provenance persist
-under app-data/candidates before polling/acceptance. Poll is explicit and
+under app-data/candidates before polling/acceptance. A post-202 storage failure retains the accepted
+candidate with a warning and disables further submission; status retry persists
+the receipt before any GET. Poll is explicit and
 read-only; completed candidates remain immutable. Reject does not change document.
 Accept requires the same document, revision, layer and frame and applies exactly
 one `replace_cel` transaction. No job cancellation claim. 401/429/410 and timeouts
