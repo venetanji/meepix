@@ -56,11 +56,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: Linux x64
-            runner: ubuntu-24.04
-            bundles: deb
-            artifact: meepix-linux-x64
-            artifact_path: src-tauri/target/release/bundle/deb/*.deb
+          - name: Linux x64 (AppImage)
+            # Older glibc baseline for broad Linux/Arch compatibility.
+            runner: ubuntu-22.04
+            bundles: appimage
+            artifact: meepix-linux-x64-appimage
+            artifact_path: src-tauri/target/release/bundle/appimage/*.AppImage
           - name: Windows x64
             runner: windows-2022
             bundles: nsis
@@ -99,6 +100,8 @@ jobs:
         env:
           # Ad-hoc signing is suitable for CI smoke builds, not notarized releases.
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
+          # AppImage build tooling can run without a FUSE mount in GitHub runners.
+          APPIMAGE_EXTRACT_AND_RUN: '1'
         run: npm run tauri -- build --bundles '${{ matrix.bundles }}'
       - name: Upload installer for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
