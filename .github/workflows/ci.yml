@@ -48,6 +48,53 @@ jobs:
       - name: Run Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
+  arch-package:
+    name: Arch Linux x86_64 native pacman package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Make a local Git ref to the exact CI checkout
+        run: git branch --force meepix-ci-package "$GITHUB_SHA"
+      - name: Build PKGBUILD on Arch Linux
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/meepix-arch-packages"
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,src=$GITHUB_WORKSPACE,dst=/repo,readonly" \
+            --mount "type=bind,src=$RUNNER_TEMP/meepix-arch-packages,dst=/packages" \
+            archlinux:base-devel bash -euo pipefail -c '
+              pacman -Syu --noconfirm
+              pacman -S --needed --noconfirm \
+                git nodejs npm rust cargo pkgconf openssl file \
+                webkit2gtk-4.1 gtk3 libappindicator librsvg xdotool
+              useradd -m -u 1000 builder
+              mkdir -p /build
+              cp /repo/packaging/arch/PKGBUILD /build/PKGBUILD
+              chown builder:builder /build
+              runuser -u builder -- bash -euo pipefail -c "\
+                git config --global --add safe.directory /repo; \
+                cd /build; \
+                MEEPIX_GIT_URL=file:///repo MEEPIX_GIT_REF=meepix-ci-package \
+                  makepkg --noconfirm --force --cleanbuild"
+              cp /build/meepix-git-*.pkg.tar.zst /packages/
+              pacman -Qip /packages/meepix-git-*.pkg.tar.zst
+              pacman -Qlp /packages/meepix-git-*.pkg.tar.zst > /tmp/meepix-package-files
+              grep -q "/usr/bin/meepix" /tmp/meepix-package-files
+              grep -q "/usr/share/applications/meepix.desktop" /tmp/meepix-package-files
+              grep -q "/usr/share/icons/hicolor/scalable/apps/meepix.svg" /tmp/meepix-package-files
+            '
+      - name: Archive native pacman package
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: meepix-arch-x64
+          path: ${{ runner.temp }}/meepix-arch-packages/*.pkg.tar.zst
+          if-no-files-found: error
+          retention-days: 14
+
   desktop:
     name: Build ${{ matrix.name }} installer
     runs-on: ${{ matrix.runner }}

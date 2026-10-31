@@ -1,0 +1,25 @@
+pkgbase = meepix-git
+	pkgdesc = Local-first AI-assisted pixel art and sprite animation editor
+	pkgver = 0.1.0.r0.g0000000
+	pkgrel = 1
+	url = https://github.com/venetanji/meepix
+	arch = x86_64
+	makedepends = git
+	makedepends = nodejs
+	makedepends = npm
+	makedepends = rust
+	makedepends = cargo
+	makedepends = pkgconf
+	makedepends = openssl
+	makedepends = file
+	depends = webkit2gtk-4.1
+	depends = gtk3
+	depends = libappindicator
+	depends = librsvg
+	depends = xdotool
+	provides = meepix
+	conflicts = meepix
+	source = meepix::git+https://github.com/venetanji/meepix.git#branch=main
+	sha256sums = SKIP
+
+pkgname = meepix-git

@@ -1,0 +1,48 @@
+# MeePix development package. For AUR submission, add a maintainer contact
+# and declare the upstream license once the repository has a LICENSE.
+#
+# Usage: cd packaging/arch && makepkg -si
+pkgname=meepix-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc='Local-first AI-assisted pixel art and sprite animation editor'
+arch=('x86_64')
+url='https://github.com/venetanji/meepix'
+# Upstream currently has no declared LICENSE. Set an accurate SPDX license
+# before public AUR submission; do not guess or assign one to the project.
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator' 'librsvg' 'xdotool')
+makedepends=('git' 'nodejs' 'npm' 'rust' 'cargo' 'pkgconf' 'openssl' 'file')
+provides=('meepix')
+conflicts=('meepix')
+# The overrides are for local CI packaging of the *checked-out commit*.
+# Normal AUR users build the canonical public GitHub main branch.
+_source_url="${MEEPIX_GIT_URL:-https://github.com/venetanji/meepix.git}"
+_source_ref="${MEEPIX_GIT_REF:-main}"
+source=("meepix::git+${_source_url}#branch=${_source_ref}")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/meepix"
+  printf '0.1.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+build() {
+  cd "$srcdir/meepix"
+  # These are development builds: dependency lockfiles are not yet committed.
+  # Once they exist, switch to npm ci and cargo --locked.
+  export npm_config_cache="$srcdir/.npm-cache"
+  export CARGO_HOME="$srcdir/.cargo-home"
+  npm install --no-audit --no-fund
+  npm run icons
+  npm run build
+  cargo build --manifest-path src-tauri/Cargo.toml --release
+}
+
+package() {
+  cd "$srcdir/meepix"
+  install -Dm755 src-tauri/target/release/meepix "$pkgdir/usr/bin/meepix"
+  install -Dm644 packaging/arch/meepix.desktop "$pkgdir/usr/share/applications/meepix.desktop"
+  install -Dm644 src-tauri/icons/source.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/meepix.svg"
+  install -Dm644 src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/meepix.png"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/meepix/README.md"
+}
