@@ -53,6 +53,7 @@ test('real Rust document: draw, layers, four frames, playback, undo and project 
   await page.getByRole('button',{name:'New',exact:true}).click();
   await expect(page.getByText('16 × 16 px',{exact:true})).toBeVisible();
   page.on('dialog',dialog=>dialog.accept());
+  await page.getByRole('textbox',{name:'Project name'}).fill('browser_smoke');
   await page.getByRole('button',{name:'Load',exact:true}).click();
   await expect(page.getByText('64 × 64 px',{exact:true})).toBeVisible();
   doc=await native(page,'document_snapshot');

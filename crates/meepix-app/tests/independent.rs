@@ -235,4 +235,67 @@ fn tool_request_cannot_supply_approval() {
 }
 
 #[test]
-fn layer_selection_change_refuses_accept(){let fake=Fake::new();let dir=tempfile::tempdir().unwrap();let app=fake.app(dir.path());let s=app.snapshot().unwrap();let first=s.active_layer_id.clone();let s=app.command(s.revision,EditCommand::AddLayer{name:"Second".into()}).unwrap();let g=completed(&app,s.revision);let selected=app.command(s.revision,EditCommand::SelectLayer{layer_id:first}).unwrap();assert_eq!(selected.revision,s.revision);assert!(app.accept(&g.id,selected.revision).is_err(),"accept must reject changed layer selection");}
+fn layer_selection_change_refuses_accept() {
+    let fake = Fake::new();
+    let dir = tempfile::tempdir().unwrap();
+    let app = fake.app(dir.path());
+    let s = app.snapshot().unwrap();
+    let first = s.active_layer_id.clone();
+    let s = app
+        .command(
+            s.revision,
+            EditCommand::AddLayer {
+                name: "Second".into(),
+            },
+        )
+        .unwrap();
+    let g = completed(&app, s.revision);
+    let selected = app
+        .command(s.revision, EditCommand::SelectLayer { layer_id: first })
+        .unwrap();
+    assert_eq!(selected.revision, s.revision);
+    assert!(
+        app.accept(&g.id, selected.revision).is_err(),
+        "accept must reject changed layer selection"
+    );
+}
+
+#[test]
+fn accepted_job_remains_recoverable_when_candidate_directory_creation_fails() {
+    let fake = Fake::new();
+    let dir = tempfile::tempdir().unwrap();
+    let app = fake.app(dir.path());
+    let candidate = dir.path().join("candidates/job_1");
+    std::fs::write(&candidate, b"block directory").unwrap();
+    let err = app
+        .submit(0, "qwen-image-2.1", "pixel bird", "generate")
+        .unwrap_err();
+    assert!(err.contains("job_1"), "missing accepted job ID: {err}");
+    assert!(
+        err.to_lowercase().contains("do not resubmit"),
+        "missing retry warning: {err}"
+    );
+    std::fs::remove_file(&candidate).unwrap();
+    std::fs::create_dir(&candidate).unwrap();
+    assert_eq!(app.poll("job_1").unwrap().status, "in_progress");
+}
+
+#[test]
+fn accepted_job_remains_recoverable_when_provenance_write_fails() {
+    let fake = Fake::new();
+    let dir = tempfile::tempdir().unwrap();
+    let app = fake.app(dir.path());
+    let candidate = dir.path().join("candidates/job_1");
+    std::fs::create_dir_all(candidate.join("provenance.json")).unwrap();
+    let err = app
+        .submit(0, "qwen-image-2.1", "pixel bird", "generate")
+        .unwrap_err();
+    assert!(err.contains("job_1"), "missing accepted job ID: {err}");
+    assert!(
+        err.to_lowercase().contains("do not resubmit"),
+        "missing retry warning: {err}"
+    );
+    assert!(candidate.join("receipt.json").is_file());
+    std::fs::remove_dir(candidate.join("provenance.json")).unwrap();
+    assert_eq!(app.poll("job_1").unwrap().status, "in_progress");
+}

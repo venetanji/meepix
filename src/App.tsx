@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
+
+function freshProjectName() {
+  return `untitled-${crypto.randomUUID()}`;
+}
 
 type Point = { x: number; y: number };
 type Color = [number, number, number, number];
@@ -162,7 +166,7 @@ export default function App({
   const [grid, setGrid] = useState(true);
   const [onion, setOnion] = useState(false);
   const [previous, setPrevious] = useState<number[] | null>(null);
-  const [name, setName] = useState("untitled");
+  const [name, setName] = useState(freshProjectName);
   const [size, setSize] = useState(64);
   const [playing, setPlaying] = useState(false);
   const [models, setModels] = useState<string[]>([]);
@@ -191,6 +195,46 @@ export default function App({
     py: number;
   } | null>(null);
   const lock = useRef(false);
+  useEffect(() => {
+    let active = true;
+    let allowClose = false;
+    let unlisten: (() => void) | undefined;
+    const hasUnsavedWork = () =>
+      !!docRef.current?.dirty || lock.current || !!stroke.current;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!allowClose && hasUnsavedWork()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    if (isTauri()) {
+      void import("@tauri-apps/api/window")
+        .then(({ getCurrentWindow }) =>
+          getCurrentWindow().onCloseRequested((event) => {
+            if (!hasUnsavedWork()) return;
+            if (window.confirm("Close MeePix and discard unsaved changes?")) {
+              allowClose = true;
+            } else {
+              event.preventDefault();
+            }
+          }),
+        )
+        .then((remove) => {
+          if (active) unlisten = remove;
+          else remove();
+        })
+        .catch((error) => {
+          if (active)
+            setError(`Could not register the close guard: ${String(error)}`);
+        });
+    }
+    return () => {
+      active = false;
+      unlisten?.();
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, []);
   const update = useCallback((next: Snapshot) => {
     docRef.current = next;
     setDoc(next);
@@ -455,7 +499,7 @@ export default function App({
             Redo
           </button>
           <button
-            disabled={busy || drawing || !doc}
+            disabled={busy || drawing || !doc || !name.trim()}
             onClick={() => void run(() => backend.save(name), "Project saved")}
           >
             Save
@@ -567,7 +611,7 @@ export default function App({
             </label>
             <div className="button-row">
               <button
-                disabled={busy || drawing}
+                disabled={busy || drawing || !name.trim()}
                 onClick={() => {
                   if (
                     doc?.dirty &&
@@ -582,7 +626,7 @@ export default function App({
                 Load
               </button>
               <button
-                disabled={busy || drawing || !doc}
+                disabled={busy || drawing || !doc || !name.trim()}
                 onClick={() => {
                   setError("");
                   backend
@@ -616,10 +660,11 @@ export default function App({
                     )
                   )
                     return;
-                  void run(
-                    () => backend.create(size, size),
-                    "New document created",
-                  );
+                  void run(async () => {
+                    const result = await backend.create(size, size);
+                    setName(freshProjectName());
+                    return result;
+                  }, "New document created");
                 }}
               >
                 New

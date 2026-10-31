@@ -143,7 +143,12 @@ impl App {
             }),
             Some(client) => Ok(Models {
                 configured: true,
-                models: client.models().map_err(|e| e.to_string())?.into_iter().filter(|id| id == "qwen-image-2.1").collect(),
+                models: client
+                    .models()
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .filter(|id| id == "qwen-image-2.1")
+                    .collect(),
             }),
         }
     }
@@ -154,7 +159,8 @@ impl App {
         prompt: &str,
         mode: &str,
     ) -> Result<Generation, String> {
-        if model.is_empty() || model.len() > 256 || prompt.trim().is_empty() || prompt.len() > 32768 {
+        if model.is_empty() || model.len() > 256 || prompt.trim().is_empty() || prompt.len() > 32768
+        {
             return Err("Invalid generation model or prompt (maximum 32768 bytes)".into());
         }
         if !matches!(mode, "generate" | "edit") {
@@ -206,7 +212,11 @@ impl App {
             })?;
         let view = Generation {
             id: receipt.id.clone(),
-            status: if receipt.status == Status::Completed { "in_progress".into() } else { status(&receipt.status).into() },
+            status: if receipt.status == Status::Completed {
+                "in_progress".into()
+            } else {
+                status(&receipt.status).into()
+            },
             model: model.into(),
             prompt: prompt.into(),
             document_id: snapshot.document_id,
@@ -223,18 +233,24 @@ impl App {
             receipt,
             epoch,
         };
-        let directory = self.candidate_dir(&proposal.view.id)?;
-        fs::create_dir_all(&directory).map_err(io_error)?;
-        write_json(&directory.join("receipt.json"), &proposal.receipt).map_err(|_| {
-            format!(
-                "Job {} accepted, but receipt could not be saved. Do not resubmit.",
-                proposal.view.id
-            )
-        })?;
-        write_json(&directory.join("provenance.json"), &proposal.view)?;
-        let _ = fs::remove_file(intent);
+        // Keep the accepted receipt reachable in memory even if local persistence fails.
         let view = proposal.view.clone();
         jobs.proposals.insert(view.id.clone(), proposal);
+        let persisted = (|| -> Result<(), String> {
+            let directory = self.candidate_dir(&view.id)?;
+            fs::create_dir_all(&directory).map_err(io_error)?;
+            let proposal = jobs
+                .proposals
+                .get(&view.id)
+                .ok_or("Missing accepted receipt")?;
+            write_json(&directory.join("receipt.json"), &proposal.receipt)?;
+            write_json(&directory.join("provenance.json"), &proposal.view)?;
+            Ok(())
+        })();
+        if persisted.is_err() {
+            return Err(format!("Easel accepted job {}, but local storage failed. Do not resubmit. Preserve this job ID and retry status after repairing storage.", view.id));
+        }
+        let _ = fs::remove_file(intent);
         Ok(view)
     }
     fn candidate_dir(&self, id: &str) -> Result<PathBuf, String> {
@@ -264,6 +280,7 @@ impl App {
             .poll(id)
             .map_err(|e| e.to_string())?;
         let directory = self.candidate_dir(id)?;
+        fs::create_dir_all(&directory).map_err(io_error)?;
         write_json(&directory.join("receipt.json"), &receipt)?;
         let pixels = if receipt.status == Status::Completed {
             let originals = jobs
