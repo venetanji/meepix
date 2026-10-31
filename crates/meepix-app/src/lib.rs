@@ -46,6 +46,7 @@ struct Generations {
 struct Document {
     editor: Editor,
     epoch: u64,
+    saved_path: Option<PathBuf>,
 }
 pub struct App {
     document: Mutex<Document>,
@@ -69,6 +70,7 @@ impl App {
             document: Mutex::new(Document {
                 editor: Editor::new(64, 64)?,
                 epoch: 1,
+                saved_path: None,
             }),
             generations: Mutex::new(Generations {
                 client,
@@ -91,6 +93,7 @@ impl App {
         let mut document = locked(&self.document)?;
         document.editor = editor;
         document.epoch += 1;
+        document.saved_path = None;
         Ok(document.editor.snapshot())
     }
     fn project_path(&self, name: &str, extension: &str) -> Result<PathBuf, String> {
@@ -115,8 +118,12 @@ impl App {
     }
     pub fn save(&self, name: &str) -> Result<Snapshot, String> {
         let path = self.project_path(name, "spriteproj")?;
-        let doc = locked(&self.document)?;
+        let mut doc = locked(&self.document)?;
+        if path.exists() && doc.saved_path.as_ref() != Some(&path) {
+            return Err("That project name already exists. Choose a new name or load that project before saving.".into());
+        }
         doc.editor.save(&path)?;
+        doc.saved_path = Some(path);
         Ok(doc.editor.snapshot())
     }
     pub fn load(&self, name: &str) -> Result<Snapshot, String> {
@@ -126,6 +133,7 @@ impl App {
         let mut doc = locked(&self.document)?;
         doc.editor = editor;
         doc.epoch += 1;
+        doc.saved_path = Some(path);
         Ok(doc.editor.snapshot())
     }
     pub fn export(&self, name: &str) -> Result<String, String> {
@@ -248,7 +256,12 @@ impl App {
             Ok(())
         })();
         if persisted.is_err() {
-            return Err(format!("Easel accepted job {}, but local storage failed. Do not resubmit. Preserve this job ID and retry status after repairing storage.", view.id));
+            let proposal = jobs
+                .proposals
+                .get_mut(&view.id)
+                .ok_or("Missing accepted receipt")?;
+            proposal.view.error = Some(format!("Easel accepted job {}, but local storage failed. Do not resubmit. Repair storage, then retry status for this candidate.", view.id));
+            return Ok(proposal.view.clone());
         }
         let _ = fs::remove_file(intent);
         Ok(view)
@@ -273,6 +286,10 @@ impl App {
         if !matches!(p.view.status.as_str(), "queued" | "in_progress" | "unknown") {
             return Ok(p.view.clone());
         }
+        let directory = self.candidate_dir(id)?;
+        fs::create_dir_all(&directory).map_err(io_error)?;
+        write_json(&directory.join("receipt.json"), &p.receipt)?;
+        write_json(&directory.join("provenance.json"), &p.view)?;
         let receipt = jobs
             .client
             .as_ref()

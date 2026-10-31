@@ -6,6 +6,7 @@ async function native(page: Page, cmd: string, args: object = {}) {
 
 test('real Rust document: draw, layers, four frames, playback, undo and project round-trip', async ({page}) => {
   const errors: string[] = [];
+  const projectName = `browser-${Date.now()}`;
   page.on('pageerror', e => errors.push(e.message));
   await page.addInitScript(() => {
     (window as any).__TAURI_INTERNALS__ = { invoke: async (cmd: string,args: object={}) => {
@@ -42,7 +43,7 @@ test('real Rust document: draw, layers, four frames, playback, undo and project 
   await expect.poll(async()=>(await native(page,'document_snapshot')).active_frame_id).not.toBe(first);
   await page.getByRole('button',{name:'Pause',exact:true}).click();
   await page.getByRole('button',{name:'Previous frame',exact:true}).click();
-  await page.getByRole('textbox',{name:'Project name'}).fill('browser_smoke');
+  await page.getByRole('textbox',{name:'Project name'}).fill(projectName);
   await page.getByRole('button',{name:'Save',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('Project saved');
   const saved=await native(page,'document_snapshot');
@@ -53,7 +54,7 @@ test('real Rust document: draw, layers, four frames, playback, undo and project 
   await page.getByRole('button',{name:'New',exact:true}).click();
   await expect(page.getByText('16 × 16 px',{exact:true})).toBeVisible();
   page.on('dialog',dialog=>dialog.accept());
-  await page.getByRole('textbox',{name:'Project name'}).fill('browser_smoke');
+  await page.getByRole('textbox',{name:'Project name'}).fill(projectName);
   await page.getByRole('button',{name:'Load',exact:true}).click();
   await expect(page.getByText('64 × 64 px',{exact:true})).toBeVisible();
   doc=await native(page,'document_snapshot');

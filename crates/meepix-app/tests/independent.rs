@@ -267,9 +267,12 @@ fn accepted_job_remains_recoverable_when_candidate_directory_creation_fails() {
     let app = fake.app(dir.path());
     let candidate = dir.path().join("candidates/job_1");
     std::fs::write(&candidate, b"block directory").unwrap();
-    let err = app
+    let accepted = app
         .submit(0, "qwen-image-2.1", "pixel bird", "generate")
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(accepted.id, "job_1");
+    assert_eq!(accepted.status, "queued");
+    let err = accepted.error.expect("storage warning");
     assert!(err.contains("job_1"), "missing accepted job ID: {err}");
     assert!(
         err.to_lowercase().contains("do not resubmit"),
@@ -287,9 +290,12 @@ fn accepted_job_remains_recoverable_when_provenance_write_fails() {
     let app = fake.app(dir.path());
     let candidate = dir.path().join("candidates/job_1");
     std::fs::create_dir_all(candidate.join("provenance.json")).unwrap();
-    let err = app
+    let accepted = app
         .submit(0, "qwen-image-2.1", "pixel bird", "generate")
-        .unwrap_err();
+        .unwrap();
+    assert_eq!(accepted.id, "job_1");
+    assert_eq!(accepted.status, "queued");
+    let err = accepted.error.expect("storage warning");
     assert!(err.contains("job_1"), "missing accepted job ID: {err}");
     assert!(
         err.to_lowercase().contains("do not resubmit"),
@@ -298,4 +304,25 @@ fn accepted_job_remains_recoverable_when_provenance_write_fails() {
     assert!(candidate.join("receipt.json").is_file());
     std::fs::remove_dir(candidate.join("provenance.json")).unwrap();
     assert_eq!(app.poll("job_1").unwrap().status, "in_progress");
+}
+
+#[test]
+fn save_rejects_another_documents_existing_project_but_allows_own_target() {
+    let dir = tempfile::tempdir().unwrap();
+    let app = App::new(dir.path().into(), None).unwrap();
+    app.save("art").unwrap();
+    let path = dir.path().join("projects/art.spriteproj");
+    let original = std::fs::read(&path).unwrap();
+    app.save("art").unwrap();
+    app.create(16, 16).unwrap();
+    assert!(
+        app.save("art").is_err(),
+        "new document must not overwrite another project"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    app.load("art").unwrap();
+    assert!(
+        app.save("art").is_ok(),
+        "loaded project may save to its own target"
+    );
 }
