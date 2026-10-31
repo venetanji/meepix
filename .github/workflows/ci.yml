@@ -1,0 +1,109 @@
+name: MeePix CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# No releases, write tokens, credentials, or live model/ComfyUI access in CI.
+permissions:
+  contents: read
+
+concurrency:
+  group: meepix-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  checks:
+    name: Frontend compile and Rust tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Install Tauri Linux prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev \
+            libgtk-3-dev pkg-config patchelf
+      - name: Use stable Rust
+        run: rustup update stable
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate placeholder platform icons
+        run: npm run icons
+      - name: Type-check and compile frontend
+        run: npm run build
+      - name: Run Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  desktop:
+    name: Build ${{ matrix.name }} installer
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            runner: ubuntu-24.04
+            bundles: deb
+            artifact: meepix-linux-x64
+            artifact_path: src-tauri/target/release/bundle/deb/*.deb
+          - name: Windows x64
+            runner: windows-2022
+            bundles: nsis
+            artifact: meepix-windows-x64
+            artifact_path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          - name: macOS ARM64
+            runner: macos-15
+            bundles: dmg
+            artifact: meepix-macos-arm64
+            artifact_path: src-tauri/target/release/bundle/dmg/*.dmg
+          - name: macOS x64
+            runner: macos-15-intel
+            bundles: dmg
+            artifact: meepix-macos-x64
+            artifact_path: src-tauri/target/release/bundle/dmg/*.dmg
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Install Tauri Linux prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev librsvg2-dev libayatana-appindicator3-dev \
+            libgtk-3-dev pkg-config patchelf
+      - name: Use stable Rust
+        run: rustup update stable
+      - name: Install JavaScript dependencies
+        run: npm install --no-audit --no-fund
+      - name: Package native application (no publishing)
+        env:
+          # Ad-hoc signing is suitable for CI smoke builds, not notarized releases.
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
+        run: npm run tauri -- build --bundles '${{ matrix.bundles }}'
+      - name: Upload installer for review
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
+          retention-days: 14
