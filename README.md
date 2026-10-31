@@ -35,6 +35,6 @@ MeePix is intended to join the [Agentic Media](https://github.com/agentic-media)
 
 ## Continuous integration
 
-GitHub Actions builds Linux (.deb), Windows (NSIS .exe), and macOS (Intel + Apple Silicon .dmg) installers on pushes to `main`, pull requests, and manual runs. Build artifacts are attached to each Actions run; nothing is automatically published. See [CI and build notes](docs/ci.md).
+GitHub Actions builds Linux (.AppImage), Windows (NSIS .exe), and macOS (Intel + Apple Silicon .dmg) packages on pushes to `main`, pull requests, and manual runs. Build artifacts are attached to each Actions run; nothing is automatically published. See [CI and build notes](docs/ci.md).
 
 Run `npm run tauri -- build` locally to package the app (icons are generated automatically). These are early unsigned/notarization-free development builds; platform security prompts may apply.
